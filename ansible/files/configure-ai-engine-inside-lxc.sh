@@ -1,10 +1,11 @@
 #!/usr/bin/env bash
 # configure-ai-engine-inside-lxc.sh
-# Version: 0.9.4
-# Description: Bootstrap llama.cpp AI engine on Ubuntu 24.04 LXC with ROCm+Vulkan dual backend
+# Version: 0.9.5
+# Description: Bootstrap llama.cpp AI engine on LXC with ROCm+Vulkan dual backend
 # Target GPU: AMD Radeon 890M (gfx1150/Strix Halo) on Proxmox 9.x privileged LXC — gfx1150-only chip
-# Requirements: Run as root inside privileged LXC with GPU passthrough (/dev/dri/card1, renderD129, /dev/kfd) and /srv/ai/models bind mount
+# Requirements: Run as root inside privileged LXC with GPU passthrough (/dev/dri/card0, renderD128, /dev/kfd) and /srv/ai/models bind mount
 # Changelog:
+#   0.9.5 - Distro-agnostic ROCm repo detection; fix package name: amdrocm-core-dev does not exist on ROCm 10.x (use amdrocm-core); explicit failure message for -dev mismatch
 #   0.9.4 - Bump ROCm default to 10.0.0 (latest 2026-08-26) — deploy never pinned; still override via ROCM_VERSION=7.14.1
 #   0.9.3 - Dual backend: llama.cpp built with GGML_HIP=ON + GGML_VULKAN=ON (gfx1150)
 #           Unpinned ROCm: ROCM_VERSION env override (default 7.14.1, latest 7.14 patch; now 10.0.0)
@@ -74,6 +75,19 @@ ROCM_VERSION="${ROCM_VERSION:-10.0.0}"
 DFLASH2_DRAFT_FILE="Qwen3.8-27B-DFlash2-Q4_K_M.gguf"
 DFLASH2_DRAFT_URL="https://huggingface.co/z-lab/Qwen3.8-27B-DFlash2-GGUF/resolve/main/Qwen3.8-27B-DFlash2-Q4_K_M.gguf?download=true"
 
+# --- DISTRO DETECTION (for ROCm repo dist name, used in ROCm repo setup) ---
+if [ -f /etc/os-release ]; then
+  . /etc/os-release
+  case "$ID" in
+    ubuntu)  ROCM_REPO_DIST="ubuntu2404" ;;
+    debian)  ROCM_REPO_DIST="debian13" ;;
+    *)       echo "WARNING: Unknown distro $ID, defaulting to ubuntu2404" && ROCM_REPO_DIST="ubuntu2404" ;;
+  esac
+else
+  echo "ERROR: /etc/os-release not found — cannot determine ROCm repo dist"
+  exit 1
+fi
+
 # --- 1. BASE DEPENDENCIES ---
 echo "[1/7] Installing base dependencies (ROCm ${ROCM_VERSION}, backend HIP+Vulkan, gfx1150)..."
 apt-get update
@@ -122,7 +136,7 @@ if [ "${ROCM_MAJOR}" -ge 10 ] 2>/dev/null; then
   wget -qO - https://stable.repo.amd.com/rocm/gpg/packages.gpg | \
     gpg --dearmor | tee /etc/apt/keyrings/amdrocm.gpg > /dev/null
   tee /etc/apt/sources.list.d/rocm.list << EOF
-deb [arch=amd64 signed-by=/etc/apt/keyrings/amdrocm.gpg] https://stable.repo.amd.com/rocm/core/packages/ubuntu2404 stable main
+deb [arch=amd64 signed-by=/etc/apt/keyrings/amdrocm.gpg] https://stable.repo.amd.com/rocm/core/packages/${ROCM_REPO_DIST} stable main
 EOF
   # Stable repo origin is stable.repo.amd.com (pin that instead of repo.radeon.com for 10.x)
   tee /etc/apt/preferences.d/rocm-pin << 'PIN'
@@ -134,7 +148,7 @@ else
   wget -qO - https://repo.amd.com/rocm/packages-multi-arch/gpg/rocm.gpg | \
     gpg --dearmor | tee /etc/apt/keyrings/amdrocm.gpg > /dev/null
   tee /etc/apt/sources.list.d/rocm.list << EOF
-deb [arch=amd64 signed-by=/etc/apt/keyrings/amdrocm.gpg] https://repo.amd.com/rocm/packages-multi-arch/ubuntu2404 stable main
+deb [arch=amd64 signed-by=/etc/apt/keyrings/amdrocm.gpg] https://repo.amd.com/rocm/packages-multi-arch/${ROCM_REPO_DIST} stable main
 EOF
   tee /etc/apt/preferences.d/rocm-pin << 'PIN'
 Package: *
@@ -152,14 +166,15 @@ apt-get update
 # ROCm package names encode major.minor (e.g. amdrocm7.14-gfx1150 for 7.14.1, amdrocm10.0 for 10.0.0).
 # For 10.x the per-GPU package may be named amdrocm10.0-gfx1150 or may be a generic amdrocm10.0; try per-GPU first, fall back to generic.
 ROCM_MM="$(echo "${ROCM_VERSION}" | cut -d. -f1,2)"
-echo "[1/7] Installing ROCm ${ROCM_VERSION} packages: amdrocm${ROCM_MM}-gfx1150 + amdrocm-core-dev${ROCM_MM}-gfx1150 ..."
+# NOTE: ROCm 10.x uses amdrocm-core${VER}-gfx1150 (runtime package). amdrocm-core-dev does NOT exist — using -dev will always fail.
+echo "[1/7] Installing ROCm ${ROCM_VERSION} packages: amdrocm${ROCM_MM}-gfx1150 + amdrocm-core${ROCM_MM}-gfx1150 ..."
 if ! apt-get install -y --no-install-recommends \
   "amdrocm${ROCM_MM}-gfx1150" \
-  "amdrocm-core-dev${ROCM_MM}-gfx1150"; then
-  echo "WARNING: per-GPU package amdrocm${ROCM_MM}-gfx1150 not found (common for 10.x); trying generic amdrocm${ROCM_MM} + amdrocm-core-dev${ROCM_MM} ..."
+  "amdrocm-core${ROCM_MM}-gfx1150"; then
+  echo "WARNING: per-GPU package amdrocm${ROCM_MM}-gfx1150 not found (common for 10.x); trying generic amdrocm${ROCM_MM} + amdrocm-core${ROCM_MM} ..."
   apt-get install -y --no-install-recommends \
     "amdrocm${ROCM_MM}" \
-    "amdrocm-core-dev${ROCM_MM}" || {
+    "amdrocm-core${ROCM_MM}" || {
       echo "ERROR: Neither per-GPU nor generic ROCm ${ROCM_VERSION} packages found." >&2
       echo "Available amdrocm packages:" >&2
       apt-cache search "^amdrocm${ROCM_MM}" 2>&1 | head -100 >&2 || true
@@ -820,7 +835,7 @@ echo ""
 echo "[Service status]"
 systemctl status "$SERVICE_NAME" --no-pager
 echo ""
-echo "[Bootstrap complete - v0.9.4]"
+echo "[Bootstrap complete - v0.9.5]"
 echo "  Native llama.cpp web UI : http://<container-ip>:80 (HIP+Vulkan dual, gfx1150-only chip)"
 echo "  Switch models with      : switch-model.sh (MTP/ngram/none; HIP default, Vulkan via RADV_PERFTEST=nogttspill)"
 echo "  GPU device              : gfx1150 (AMD Radeon 890M) — ROCm HIP + Vulkan RADV"

@@ -79,7 +79,7 @@ This is what is already implemented and verified in this repository.
 
 ## Configuration Scripts
 
-- `deploy-hlh-ai-engine.sh` - Full LXC `112` creation, GPU passthrough (`card1`+`renderD129`+`kfd`), bootstrap with `ROCM_VERSION` header + `HIP+Vulkan` `gfx1150` description
+- `deploy-hlh-ai-engine.sh` - Full LXC `112` creation, GPU passthrough (`card0`+`renderD128`+`kfd`), bootstrap with `ROCM_VERSION` header + `HIP+Vulkan` `gfx1150` description
 - `configure-hlh-ai-engine.sh` - Ansible-based reconfiguration with `--host` and `--offline` flags (`hlh_offline` → `HLH_OFFLINE`)
 
 ## Service Lifecycle

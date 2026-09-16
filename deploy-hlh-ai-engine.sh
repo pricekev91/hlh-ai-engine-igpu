@@ -250,7 +250,7 @@ pct create "${LXC_ID}" "${LXC_IMAGE}" \
 	--description "llama.cpp AI engine ${LLAMA_BACKEND} ROCm ${ROCM_VERSION}, model storage on ${POOL} (Qwen3-Coder-30B)"
 
 echo "[3/6] Adding GPU/ROCm passthrough devices..."
-# Only the 890M iGPU (gfx1150): card1 (226:1) + renderD129 (226:129)
+# Only the 890M iGPU (gfx1150): card0 (226:0) + renderD128 (226:128)
 # RX 480 eGPU (gfx803) nodes are intentionally excluded so ROCm cannot
 # enumerate the unsupported device as GPU 0 and fail the entire init chain.
 # KFD is shared (511:0) but ROCm only sees GPUs that have a visible renderD.
@@ -259,6 +259,7 @@ cat >> "/etc/pve/lxc/${LXC_ID}.conf" <<'LXCCONF'
 # GPU passthrough - 890M iGPU only (gfx1150/Strix Halo, 0000:c9:00.0)
 # card0 (226:0) + renderD128 (226:128) is the 890M (1002:150e); card1/2 + renderD129/130 are Tesla K80s (10de:102d) via OCuLink — intentionally NOT passed.
 # Earlier configs used card1/renderD129 when K80 was not enumerated as card0; on current host (trixie, 7.0.14-11-pve) 890M is card0.
+# NOTE: If your host has 890M at a different index, verify with: lspci | grep -i vga
 lxc.cgroup2.devices.allow: c 226:0 rwm
 lxc.cgroup2.devices.allow: c 226:128 rwm
 # kfd major is 511 on ROCm 7.x, 234 on ROCm 10.x (both seen on trixie) — allow both for forward compat

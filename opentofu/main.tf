@@ -51,7 +51,7 @@ resource "proxmox_lxc" "hlh_ai_engine" {
   # Do NOT use Proxmox native GPU passthrough here; it exposes all DRM devices
   # and causes ROCm to enumerate the RX 480 (gfx803, unsupported) as GPU 0.
   # Instead, deploy-hlh-ai-engine.sh appends explicit cgroup2/device mount rules
-  # that expose only the 890M's DRM nodes (card1 226:1, renderD129 226:129) + shared kfd (511:0).
+  # that expose only the 890M's DRM nodes (card0 226:0, renderD128 226:128) + shared kfd (511:0 on ROCm 7.x, 234:0 on ROCm 10.x).
   # Bootstrap then builds llama.cpp dual HIP+Vulkan (GGML_HIP=ON + GGML_VULKAN=ON, AMDGPU_TARGETS=gfx1150).
 
   # Model storage volume mount (host /srv/ai/models -> LXC /srv/ai/models)
