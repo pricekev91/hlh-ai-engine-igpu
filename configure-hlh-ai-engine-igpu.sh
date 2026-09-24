@@ -49,11 +49,12 @@ done
 if $BOOTSTRAP_INSIDE; then
     # --- BEGIN BOOTSTRAP LOGIC (formerly ansible/files/configure-ai-engine-inside-lxc.sh) ---
 # configure-ai-engine-inside-lxc.sh
-# Version: 0.9.5
+# Version: 0.9.6
 # Description: Bootstrap llama.cpp AI engine on LXC with ROCm+Vulkan dual backend
 # Target GPU: AMD Radeon 890M (gfx1150/Strix Halo) on Proxmox 9.x privileged LXC — gfx1150-only chip
 # Requirements: Run as root inside privileged LXC with GPU passthrough (/dev/dri/card0, renderD128, /dev/kfd) and /srv/ai/models bind mount
 # Changelog:
+#   0.9.6 - Fix 0.9.5 regression: amdrocm-core-dev10.0-gfx1150 DOES exist (dev metapackage ships hip-lang-config.cmake); install it after runtime
 #   0.9.5 - Distro-agnostic ROCm repo detection; fix package name: amdrocm-core-dev does not exist on ROCm 10.x (use amdrocm-core); explicit failure message for -dev mismatch
 #   0.9.4 - Bump ROCm default to 10.0.0 (latest 2026-08-26) — deploy never pinned; still override via ROCM_VERSION=7.14.1
 #   0.9.3 - Dual backend: llama.cpp built with GGML_HIP=ON + GGML_VULKAN=ON (gfx1150)
@@ -215,7 +216,9 @@ apt-get update
 # ROCm package names encode major.minor (e.g. amdrocm7.14-gfx1150 for 7.14.1, amdrocm10.0 for 10.0.0).
 # For 10.x the per-GPU package may be named amdrocm10.0-gfx1150 or may be a generic amdrocm10.0; try per-GPU first, fall back to generic.
 ROCM_MM="$(echo "${ROCM_VERSION}" | cut -d. -f1,2)"
-# NOTE: ROCm 10.x uses amdrocm-core${VER}-gfx1150 (runtime package). amdrocm-core-dev does NOT exist — using -dev will always fail.
+# NOTE: ROCm 10.x splits runtime (amdrocm-core) from dev (amdrocm-core-dev).
+# hip-lang-config.cmake (needed for llama.cpp HIP builds) ships in the DEV metapackage:
+# amdrocm-core-dev10.0-gfx1150 (verified via apt-cache on live 112). 0.9.5 wrongly dropped -dev.
 echo "[1/7] Installing ROCm ${ROCM_VERSION} packages: amdrocm${ROCM_MM}-gfx1150 + amdrocm-core${ROCM_MM}-gfx1150 ..."
 if ! apt-get install -y --no-install-recommends \
   "amdrocm${ROCM_MM}-gfx1150" \
@@ -231,6 +234,16 @@ if ! apt-get install -y --no-install-recommends \
       exit 1
     }
   echo "Installed generic amdrocm${ROCM_MM} (no per-GPU suffix) — verify gfx1150 is in this bundle via 'rocm-smi' + 'rocminfo | grep gfx'"
+fi
+
+echo "[1/7] Installing ROCm dev metapackage for HIP CMake (hip-lang-config.cmake): amdrocm-core-dev${ROCM_MM}-gfx1150 ..."
+if ! apt-get install -y --no-install-recommends "amdrocm-core-dev${ROCM_MM}-gfx1150"; then
+  echo "WARNING: per-GPU dev amdrocm-core-dev${ROCM_MM}-gfx1150 not found; trying generic amdrocm-core-dev${ROCM_MM} ..."
+  apt-get install -y --no-install-recommends "amdrocm-core-dev${ROCM_MM}" || {
+    echo "ERROR: ROCm dev package not found — HIP builds will fail without hip-lang-config.cmake." >&2
+    apt-cache search "^amdrocm-core-dev${ROCM_MM}" 2>&1 | head -30 >&2 || true
+    exit 1
+  }
 fi
 
 # llama.cpp HIP builds require the HIP CMake package (hip-lang-config.cmake),
