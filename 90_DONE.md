@@ -4,8 +4,8 @@ This is what is already implemented and verified in this repository.
 
 ## LXC Deployment
 
-- Direct Proxmox LXC creation via `deploy-hlh-ai-engine.sh` (no OpenTofu required for initial setup) — **LXC 112** (`.12` parity with `192.168.1.12`, Proxmox requires `>=100`)
-- Privileged LXC `112` with hostname `hlh-ai-engine`
+- Direct Proxmox LXC creation via `deploy-hlh-ai-engine-igpu.sh` (no OpenTofu required for initial setup) — **LXC 112** (`.12` parity with `192.168.1.12`, Proxmox requires `>=100`)
+- Privileged LXC `112` with hostname `hlh-ai-engine-igpu`
 - 48 GiB RAM (`49152`), 12 cores, 64 GiB rootfs on `RaidZ1-6TB` pool, `onboot 1`
 - Static IP assignment: `192.168.1.12/24` gw `192.168.1.1` `vmbr0`
 - Nesting and keyctl features enabled (`nesting=1,keyctl=1`)
@@ -23,7 +23,7 @@ This is what is already implemented and verified in this repository.
 
 ## ROCm / Runtime
 
-- ROCm **unpinned, never pinned**: `ROCM_VERSION` env default `10.0.0` (2026-08-26 latest), `7.14.1` still supported via `ROCM_VERSION=7.14.1 ./deploy-hlh-ai-engine.sh` — deploy always prints version, forwarded into LXC. GPU PCI: `card0` (was `card1`), `renderD128` (was `renderD129`), `kfd` `511:0` (ROCm 7) + `234:0` (ROCm 10, `2713d18`)
+- ROCm **unpinned, never pinned**: `ROCM_VERSION` env default `10.0.0` (2026-08-26 latest), `7.14.1` still supported via `ROCM_VERSION=7.14.1 ./deploy-hlh-ai-engine-igpu.sh` — deploy always prints version, forwarded into LXC. GPU PCI: `card0` (was `card1`), `renderD128` (was `renderD129`), `kfd` `511:0` (ROCm 7) + `234:0` (ROCm 10, `2713d18`)
 - ROCm package names track `major.minor`: `amdrocm${ROCM_MM}-gfx1150` + `amdrocm-core-dev${ROCM_MM}-gfx1150` (`ROCM_MM=$(cut -d. -f1,2)`)
 - ROCm repo keyrings and APT pinning configured (`repo.radeon.com` Pin-Priority `1001`, `rocminfo` removed)
 - Vulkan deps restored: `libvulkan-dev`, `glslang-tools` (`glslc`), `spirv-tools`, `vulkan-tools` (for `GGML_VULKAN=ON`, RADV `GFX1150`)
@@ -51,11 +51,11 @@ This is what is already implemented and verified in this repository.
 
 ## Ansible Configuration
 
-- Ansible inventory: `ansible/inventories/hlh-ai-engine.yml` (`192.168.1.12` `ansible_user: root`)
-- Playbook: `ansible/playbooks/hlh-ai-engine.yml` (`ansible.builtin.script` → `configure-ai-engine-inside-lxc.sh`)
+- Ansible inventory: `ansible/inventories/hlh-ai-engine-igpu.yml` (`192.168.1.12` `ansible_user: root`)
+- Playbook: `ansible/playbooks/hlh-ai-engine-igpu.yml` (`ansible.builtin.script` → `configure-ai-engine-inside-lxc.sh`)
 - Bootstrap script: `ansible/files/configure-ai-engine-inside-lxc.sh` **(v0.9.4)** dual `HIP+Vulkan`, unpinned `ROCM_VERSION` `10.0.0` default, never pinned
 - SSH key-based auth: `~/.ssh/id_ed25519`
-- Reconfiguration via `configure-hlh-ai-engine.sh` with `--host` and `--offline` flags
+- Reconfiguration via `configure-hlh-ai-engine-igpu.sh` with `--host` and `--offline` flags
 
 ## Speculative Decoding (MTP / standard)
 
@@ -75,12 +75,12 @@ This is what is already implemented and verified in this repository.
 - Proxmox provider: `telmate/proxmox >= 2.7.2` (BACKLOG: migrate to `bpg/proxmox`)
 - LXC resource `proxmox_lxc hlh_ai_engine` `vmid 112` `192.168.1.12/24`, `48G`/`12c`/`64G` on `RaidZ1-6TB`, `mp0 /srv/ai/models`
 - Variables for API URL, token auth, network, and storage (`opentofu/variables.tf`)
-- GPU passthrough (cgroup allow + mount entries) **appended by `deploy-hlh-ai-engine.sh` post-create** (not native provider passthrough — avoids exposing `gfx803`)
+- GPU passthrough (cgroup allow + mount entries) **appended by `deploy-hlh-ai-engine-igpu.sh` post-create** (not native provider passthrough — avoids exposing `gfx803`)
 
 ## Configuration Scripts
 
-- `deploy-hlh-ai-engine.sh` - Full LXC `112` creation, GPU passthrough (`card0`+`renderD128`+`kfd`), bootstrap with `ROCM_VERSION` header + `HIP+Vulkan` `gfx1150` description
-- `configure-hlh-ai-engine.sh` - Ansible-based reconfiguration with `--host` and `--offline` flags (`hlh_offline` → `HLH_OFFLINE`)
+- `deploy-hlh-ai-engine-igpu.sh` - Full LXC `112` creation, GPU passthrough (`card0`+`renderD128`+`kfd`), bootstrap with `ROCM_VERSION` header + `HIP+Vulkan` `gfx1150` description
+- `configure-hlh-ai-engine-igpu.sh` - Ansible-based reconfiguration with `--host` and `--offline` flags (`hlh_offline` → `HLH_OFFLINE`)
 
 ## Service Lifecycle
 

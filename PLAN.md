@@ -1,8 +1,8 @@
-# FIX PLAN — hlh-ai-engine
+# FIX PLAN — hlh-ai-engine-igpu
 
 ## Status: Awaiting Approval
 
-This plan documents every known problem in the `hlh-ai-engine` repo, the root cause, and the step-by-step fix. Do NOT start fixing until this plan is approved.
+This plan documents every known problem in the `hlh-ai-engine-igpu` repo, the root cause, and the step-by-step fix. Do NOT start fixing until this plan is approved.
 
 ---
 
@@ -20,9 +20,9 @@ Result: the deploy script *works* at runtime because the LXC config block (lines
 
 **Where:**
 - `ansible/files/configure-ai-engine-inside-lxc.sh` line 6: `Requirements: ... /dev/dri/card1, renderD129, /dev/kfd`
-- `deploy-hlh-ai-engine.sh` line 253: `# Only the 890M iGPU (gfx1150): card1 (226:1) + renderD129 (226:129)`
+- `deploy-hlh-ai-engine-igpu.sh` line 253: `# Only the 890M iGPU (gfx1150): card1 (226:1) + renderD129 (226:129)`
 - `opentofu/main.tf` line 54: `# card1 226:1, renderD129 226:129 + shared kfd (511:0)`
-- `90_DONE.md` line 82: `deploy-hlh-ai-engine.sh ... GPU passthrough (card1+renderD129+kfd)`
+- `90_DONE.md` line 82: `deploy-hlh-ai-engine-igpu.sh ... GPU passthrough (card1+renderD129+kfd)`
 
 **What it should be:** `card0`, `renderD128`, `226:128`, `226:1`
 
@@ -51,9 +51,9 @@ DIST_ID="$(. /etc/os-release && echo "${ID}${VERSION_ID:0:2}")"
 ### 2.3 Deploy Script Contradictory Comments
 
 **Where:**
-- `deploy-hlh-ai-engine.sh` line 253: `# Only the 890M iGPU (gfx1150): card1 (226:1) + renderD129 (226:129)`
-- `deploy-hlh-ai-engine.sh` line 260: `# card0 (226:0) + renderD128 (226:128) is the 890M`
-- `deploy-hlh-ai-engine.sh` line 261: `# Earlier configs used card1/renderD129 when K80 was not enumerated as card0`
+- `deploy-hlh-ai-engine-igpu.sh` line 253: `# Only the 890M iGPU (gfx1150): card1 (226:1) + renderD129 (226:129)`
+- `deploy-hlh-ai-engine-igpu.sh` line 260: `# card0 (226:0) + renderD128 (226:128) is the 890M`
+- `deploy-hlh-ai-engine-igpu.sh` line 261: `# Earlier configs used card1/renderD129 when K80 was not enumerated as card0`
 
 **The contradiction:** Line 253 says "Only the 890M iGPU ... card1 + renderD129" but the actual cgroup/mount block (lines 262-274) uses `card0` + `renderD128`. The correct IDs are in the block; the summary comment on line 253 is wrong.
 
@@ -69,7 +69,7 @@ DIST_ID="$(. /etc/os-release && echo "${ID}${VERSION_ID:0:2}")"
 ### 2.5 90_DONE.md Stale Deploy Script Reference
 
 **Where:**
-- `90_DONE.md` line 82: `deploy-hlh-ai-engine.sh - Full LXC 112 creation, GPU passthrough (card1+renderD129+kfd)`
+- `90_DONE.md` line 82: `deploy-hlh-ai-engine-igpu.sh - Full LXC 112 creation, GPU passthrough (card1+renderD129+kfd)`
 
 **Fix:** Change to `card0+renderD128+kfd`.
 
@@ -121,7 +121,7 @@ The fundamental problem is a **separation of concerns failure**:
 **Step 1.1: Fix all stale GPU PCI ID references in comments**
 
 Files to touch (6 locations):
-- `deploy-hlh-ai-engine.sh` line 253: Change summary comment from `card1/renderD129` to `card0/renderD128`
+- `deploy-hlh-ai-engine-igpu.sh` line 253: Change summary comment from `card1/renderD129` to `card0/renderD128`
 - `ansible/files/configure-ai-engine-inside-lxc.sh` line 6: Change Requirements comment from `card1, renderD129` to `card0, renderD128`
 - `opentofu/main.tf` lines 50-55: Update GPU comments from `card1/renderD129/511:0` to `card0/renderD128/511:0+234:0`
 - `90_DONE.md` line 82: Change deploy description from `card1+renderD129` to `card0+renderD128`
@@ -180,7 +180,7 @@ apt-cache show amdrocm-core-dev 2>/dev/null || echo "amdrocm-core-dev NOT FOUND"
 **Step 3.2: Align deploy and bootstrap**
 
 Once we know the correct package names, update both:
-- `deploy-hlh-ai-engine.sh` line 178 (host-side install)
+- `deploy-hlh-ai-engine-igpu.sh` line 178 (host-side install)
 - `ansible/files/configure-ai-engine-inside-lxc.sh` lines 156-157 (LXC-side install)
 
 Both should use the same package naming convention. If `amdrocm10.0` (no suffix) is the correct runtime package, use that in both places.
@@ -190,7 +190,7 @@ Both should use the same package naming convention. If `amdrocm10.0` (no suffix)
 **Step 4.1: Dry-run the deploy script**
 
 ```bash
-ROCM_VERSION=10.0.0 ./deploy-hlh-ai-engine.sh --help  # Just verify syntax
+ROCM_VERSION=10.0.0 ./deploy-hlh-ai-engine-igpu.sh --help  # Just verify syntax
 ```
 
 **Step 4.2: Verify cgroup rules in deploy output**
@@ -236,7 +236,7 @@ These items are working and do NOT need changes:
 - Model storage mount (mp0)
 - OpenTofu module structure (vmid, network, storage)
 - switch-model.sh v1.7.0
-- deploy-hlh-ai-engine.sh version printing (header + footer)
+- deploy-hlh-ai-engine-igpu.sh version printing (header + footer)
 - ROCm 10.x repo detection on host (deploy lines 142-163)
 - Host repo dist detection (deploy lines 87-97)
 
@@ -278,5 +278,5 @@ These items are working and do NOT need changes:
 ---
 
 **Last updated:** 2026-09-15
-**Author:** hlh-ai-engine session
+**Author:** hlh-ai-engine-igpu session
 **Pending:** Awaiting user approval to begin Phase 1

@@ -1,6 +1,6 @@
 ---
 - name: Configure HLH AI engine
-  hosts: hlh_ai_engine
+  hosts: hlh_ai_engine_igpu
   become: true
   vars:
     hlh_offline: false

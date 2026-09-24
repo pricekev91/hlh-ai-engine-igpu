@@ -11,7 +11,7 @@ Active items in progress. These are the current focus areas.
 ## This Week
 
 - [ ] Validate ROCm 10.x compatibility on latest Proxmox kernel after `2713d18` kfd `234:0` addition
-- [ ] Verify cgroup rules (`226:1`, `226:128`, `511:0`, `234:0`) survive LXC redeploy with `deploy-hlh-ai-engine.sh`
+- [ ] Verify cgroup rules (`226:1`, `226:128`, `511:0`, `234:0`) survive LXC redeploy with `deploy-hlh-ai-engine-igpu.sh`
 
 ## Done (2026-09-11 — v0.9.4 + v0.9.3)
 

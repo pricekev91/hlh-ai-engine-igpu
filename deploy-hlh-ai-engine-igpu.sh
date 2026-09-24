@@ -7,10 +7,10 @@ BOOTSTRAP_SCRIPT="${SCRIPT_DIR}/ansible/files/configure-ai-engine-inside-lxc.sh"
 usage() {
 	cat <<'EOF'
 Usage:
-	./deploy-hlh-ai-engine.sh
+	./deploy-hlh-ai-engine-igpu.sh
 
 This is the direct Proxmox bootstrap path (no OpenTofu):
-	1) Create privileged LXC 112 (hlh-ai-engine)
+	1) Create privileged LXC 112 (hlh-ai-engine-igpu)
   2) Configure GPU passthrough
   3) Start container
   4) Push/run in-container bootstrap script
@@ -18,8 +18,8 @@ EOF
 }
 
 LXC_ID=112
-LXC_NAME="hlh-ai-engine"
-LXC_HOSTNAME="hlh-ai-engine"
+LXC_NAME="hlh-ai-engine-igpu"
+LXC_HOSTNAME="hlh-ai-engine-igpu"
 LXC_IMAGE="local:vztmpl/ubuntu-24.04-standard_24.04-2_amd64.tar.zst"
 POOL="RaidZ1-6TB"
 MODEL_HOST_DIR="/srv/ai/models"
@@ -29,7 +29,7 @@ LXC_MEMORY="49152"
 LXC_CORES="12"
 LXC_IP_CONFIG="192.168.1.12/24"
 LXC_GATEWAY="192.168.1.1"
-# ROCm version tracks latest stable — default is latest upstream (10.0.0 2026-08-26); override with env: ROCM_VERSION=7.14.1 ./deploy-hlh-ai-engine.sh
+# ROCm version tracks latest stable — default is latest upstream (10.0.0 2026-08-26); override with env: ROCM_VERSION=7.14.1 ./deploy-hlh-ai-engine-igpu.sh
 # Never pinned — deploy always prints the version it will build (see header/footer) and forwards ROCM_VERSION into the LXC.
 ROCM_VERSION="${ROCM_VERSION:-10.0.0}"
 LLAMA_BACKEND="HIP+Vulkan (gfx1150, dual)"
@@ -52,9 +52,9 @@ done
 command -v pct >/dev/null 2>&1 || { echo "ERROR: pct command not found. Run on Proxmox host." >&2; exit 1; }
 [[ -f "$BOOTSTRAP_SCRIPT" ]] || { echo "ERROR: Bootstrap script not found: $BOOTSTRAP_SCRIPT" >&2; exit 1; }
 
-echo "=== hlh-ai-engine deploy ==="
+echo "=== hlh-ai-engine-igpu deploy ==="
 echo "  LXC          : ${LXC_ID} (${LXC_NAME}) ${LXC_IP_CONFIG} on ${POOL}"
-echo "  ROCm version : ${ROCM_VERSION} (override: ROCM_VERSION=x.y.z ./deploy-hlh-ai-engine.sh)"
+echo "  ROCm version : ${ROCM_VERSION} (override: ROCM_VERSION=x.y.z ./deploy-hlh-ai-engine-igpu.sh)"
 echo "  Backend      : ${LLAMA_BACKEND} — llama.cpp built with GGML_HIP=ON + GGML_VULKAN=ON"
 echo "  Model dir    : ${MODEL_HOST_DIR} -> ${MODEL_LXC_DIR}"
 echo ""
@@ -198,7 +198,7 @@ PIN
       ;;
     *)
       echo "Skipping host ROCm upgrade — LXC will be built with ${ROCM_VERSION} but may fail with 'no ROCm device' if host stays on ${HOST_ROCM_VERSION}."
-      echo "You can re-run with ROCM_VERSION=${HOST_ROCM_VERSION} ./deploy-hlh-ai-engine.sh to match host, or re-run and answer 'y' to upgrade host."
+      echo "You can re-run with ROCM_VERSION=${HOST_ROCM_VERSION} ./deploy-hlh-ai-engine-igpu.sh to match host, or re-run and answer 'y' to upgrade host."
       echo ""
       ;;
   esac
@@ -207,7 +207,7 @@ fi
 confirm_existing_lxc_delete() {
 	local answer
 
-	printf '%s\n' 'Are you sure?  hlh-ai-engine is already running and deployed!'
+	printf '%s\n' 'Are you sure?  hlh-ai-engine-igpu is already running and deployed!'
 	printf '%s' 'Delete it and redeploy? [y/N] '
 	read -r answer
 

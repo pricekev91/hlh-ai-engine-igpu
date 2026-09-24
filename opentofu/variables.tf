@@ -23,7 +23,7 @@ variable "target_node" {
 variable "hostname" {
   description = "LXC hostname"
   type        = string
-  default     = "hlh-ai-engine"
+  default     = "hlh-ai-engine-igpu"
 }
 
 variable "vmid" {
@@ -100,7 +100,7 @@ variable "lxc_root_password" {
 }
 
 variable "description" {
-  description = "LXC description (ROCm version is unpinned, never pinned — set via deploy-hlh-ai-engine.sh ROCM_VERSION env, default 10.0.0 2026-08-26)"
+  description = "LXC description (ROCm version is unpinned, never pinned — set via deploy-hlh-ai-engine-igpu.sh ROCM_VERSION env, default 10.0.0 2026-08-26)"
   type        = string
   default     = "llama.cpp AI engine HIP+Vulkan gfx1150 (ROCm 10.0.0 dual, never pinned) model storage on RaidZ1-6TB"
 }

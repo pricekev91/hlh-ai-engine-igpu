@@ -3,8 +3,8 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ANSIBLE_DIR="${SCRIPT_DIR}/ansible"
-INVENTORY="${ANSIBLE_DIR}/inventories/hlh-ai-engine.yml"
-PLAYBOOK="${ANSIBLE_DIR}/playbooks/hlh-ai-engine.yml"
+INVENTORY="${ANSIBLE_DIR}/inventories/hlh-ai-engine-igpu.yml"
+PLAYBOOK="${ANSIBLE_DIR}/playbooks/hlh-ai-engine-igpu.yml"
 SSH_KEY="${SSH_KEY:-$HOME/.ssh/id_ed25519}"
 HOST_OVERRIDE=""
 OFFLINE=0
@@ -12,7 +12,7 @@ OFFLINE=0
 usage() {
     cat <<'EOF'
 Usage:
-  ./configure-hlh-ai-engine.sh [--host <ip>] [--offline]
+  ./configure-hlh-ai-engine-igpu.sh [--host <ip>] [--offline]
 
 Options:
   --host <ip>  Override target host from inventory.

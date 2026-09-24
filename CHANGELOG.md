@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- **Repo renamed** `hlh-ai-engine` → `hlh-ai-engine-igpu` — named for the 890M iGPU slot (.12), matching `hlh-ai-engine-egpu` (.11 workhorse) scheme.
+- **Hostname** `hlh-ai-engine` → `hlh-ai-engine-igpu`; scripts `deploy-/configure-hlh-ai-engine-igpu.sh`; ansible `hlh_ai_engine_igpu` group + `hlh-ai-engine-igpu.yml` inventory/playbook; opentofu `hlh_ai_engine_igpu` resource. VMID stays `112`, IP stays `192.168.1.12`, 48GB RAM unchanged.
+
 ### Added
 
 - switch-model.sh v1.6.1: real readiness check (`/health` probe, crash-loop detection)
@@ -53,7 +58,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 
 - Bump ROCm default **never pinned** to `10.0.0` (2026-08-26 latest; was `7.14.1` `2026-09-02` patch) — deploy always prints version, `ROCM_VERSION=7.14.1` still supported via env override
-- Both `deploy-hlh-ai-engine.sh:34` and `ansible/files/configure-ai-engine-inside-lxc.sh:72` now default `ROCM_VERSION=10.0.0`; comments say never pinned
+- Both `deploy-hlh-ai-engine-igpu.sh:34` and `ansible/files/configure-ai-engine-inside-lxc.sh:72` now default `ROCM_VERSION=10.0.0`; comments say never pinned
 - `README`/`90_DONE` `7.14.1` → `10.0.0` default, `10_ACTIVE` `7.14.1`→`10.0.0`, `opentofu` description `7.14.1`→`10.0.0`, bootstrap `v0.9.3→v0.9.4`
 
 ## [0.9.3] - 2026-09-11
@@ -69,14 +74,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - **ROCm unpinned**: `ROCM_VERSION` env default `7.14.1` (2026-09-02 latest `7.14` patch; was pinned `7.14.0`), supports `10.0.0` major
   Packages track `major.minor`: `amdrocm${MM}-gfx1150` + `amdrocm-core-dev${MM}-gfx1150` (`ROCM_MM=$(cut -d. -f1,2)`)
-  Both `deploy-hlh-ai-engine.sh:32` and `ansible/files/configure-ai-engine-inside-lxc.sh:64` respect `ROCM_VERSION=10.0.0 ./deploy-hlh-ai-engine.sh`
+  Both `deploy-hlh-ai-engine-igpu.sh:32` and `ansible/files/configure-ai-engine-inside-lxc.sh:64` respect `ROCM_VERSION=10.0.0 ./deploy-hlh-ai-engine-igpu.sh`
 - `DEFAULT_MODEL_URL` fixed: `bartowski/Qwen3-Coder-30B-A3B-Instruct-GGUF` (was `Qwen2.5-Coder-32B` path containing `Qwen3-Coder-30B` file)
 - Docs current: `README` `LXC 101→112`, `vmid 101→112`, `GPU Backend Notes` dual `HIP+Vulkan` `88G` UMA vs `48G` HIP, `Health Checks` `vulkaninfo`/`HIP+Vulkan nm`, `90_DONE` `LXC 112` `amdrocm${MM}` `v0.9.3`
 - Bootstrap version `0.9.2 → 0.9.3`, `description` `ROCm+Vulkan dual` `gfx1150-only chip`
 
 ### Fixed
 
-- `deploy-hlh-ai-engine.sh:141` `http://<container-ip>:8080` → `http://<container-ip>:80` (native web UI, was stale after `80` migration)
+- `deploy-hlh-ai-engine-igpu.sh:141` `http://<container-ip>:8080` → `http://<container-ip>:80` (native web UI, was stale after `80` migration)
 - Bootstrap Vulkan verification: `glslc` check, `vulkaninfo --summary` after device passthrough, `nm ... | grep hip|vulkan` dual symbol check (was HIP-only)
 
 ## [0.3.1] - 2026-06
@@ -110,7 +115,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 
 - Move ai-engine webui to port 80 and remove turboquant option (5c53144)
-- Rename ai-engine LXC hostname to hlh-ai-engine (9db702b)
+- Rename ai-engine LXC hostname to hlh-ai-engine-igpu (9db702b)
 - Rename ai-engine provision script to deploy (56b615f)
 
 ### Added
@@ -132,8 +137,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - ROCm 7.2.3 installation via amdgpu-install
 - Ansible playbook for in-container configuration
 - OpenTofu module for Proxmox LXC provisioning
-- deploy-hlh-ai-engine.sh: LXC creation, GPU passthrough, bootstrap
-- Configure-hlh-ai-engine.sh: in-container configuration
+- deploy-hlh-ai-engine-igpu.sh: LXC creation, GPU passthrough, bootstrap
+- Configure-hlh-ai-engine-igpu.sh: in-container configuration
 
 ### Fixed
 

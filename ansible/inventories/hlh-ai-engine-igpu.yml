@@ -1,7 +1,7 @@
 ---
 all:
   children:
-    hlh_ai_engine:
+    hlh_ai_engine_igpu:
       hosts:
         192.168.1.12:
           ansible_host: 192.168.1.12

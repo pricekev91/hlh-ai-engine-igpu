@@ -1,4 +1,4 @@
-# hlh-ai-engine
+# hlh-ai-engine-igpu
 
 Infrastructure-as-Code for the HLH shared AI inference engine. Deploys a GPU-accelerated
 llama.cpp runtime as a Proxmox LXC container with ROCm + Vulkan dual backend.
@@ -9,8 +9,8 @@ This repository deploys and configures the **engine** LXC on the HLH Proxmox hos
 engine is a shared AI inference service consumed by all application repos (TrashPanda,
 BrickCipher, VoxChimera).
 
-- LXC 112, hostname `hlh-ai-engine`, IP `192.168.1.12` (gateway `192.168.1.1`)
-- ROCm `10.0.0` default (2026-08-26 latest; unpinned — override: `ROCM_VERSION=7.14.1 ./deploy-hlh-ai-engine.sh`) with AMD RDNA 3.5 890M iGPU (gfx1150, Strix Halo) — deploy always prints version, never pinned
+- LXC 112, hostname `hlh-ai-engine-igpu`, IP `192.168.1.12` (gateway `192.168.1.1`)
+- ROCm `10.0.0` default (2026-08-26 latest; unpinned — override: `ROCM_VERSION=7.14.1 ./deploy-hlh-ai-engine-igpu.sh`) with AMD RDNA 3.5 890M iGPU (gfx1150, Strix Halo) — deploy always prints version, never pinned
 - llama.cpp **dual backend** `HIP+Vulkan` (`GGML_HIP=ON + GGML_VULKAN=ON`, `AMDGPU_TARGETS=gfx1150`, `HSA_OVERRIDE_GFX_VERSION=11.5.0`) — HIP is ROCm; Vulkan is RADV; no inference perf hit vs pure HIP
 - llama.cpp backend serving native web UI on port `80` (`/health` + `/v1` OpenAI API)
 - Model storage on `RaidZ1-6TB` ZFS pool (`/srv/ai/models` host → `/srv/ai/models` LXC bind mount, same path)
@@ -33,9 +33,9 @@ BrickCipher, VoxChimera).
 Deploy the AI engine LXC on the Proxmox host (upgrades host ROCm if needed, then LXC — always prints version, never pinned):
 
 ```bash
-./deploy-hlh-ai-engine.sh              # default 10.0.0 (latest 2026-08-26) — prompts to upgrade host 7.14→10.0 if needed
+./deploy-hlh-ai-engine-igpu.sh              # default 10.0.0 (latest 2026-08-26) — prompts to upgrade host 7.14→10.0 if needed
 # Override ROCm version (never pinned):
-ROCM_VERSION=7.14.1 ./deploy-hlh-ai-engine.sh   # stay on older stable to match host without upgrade
+ROCM_VERSION=7.14.1 ./deploy-hlh-ai-engine-igpu.sh   # stay on older stable to match host without upgrade
 # Bootstrap also respects: ROCM_VERSION=10.0.0 bash ansible/files/configure-ai-engine-inside-lxc.sh
 # Host must match LXC major (7.x vs 10.x): deploy now checks host $(get_host_rocm_version) and prompts to upgrade host via stable.repo.amd.com
 ```
@@ -43,8 +43,8 @@ ROCM_VERSION=7.14.1 ./deploy-hlh-ai-engine.sh   # stay on older stable to match 
 Reconfigure an existing LXC via Ansible:
 
 ```bash
-./configure-hlh-ai-engine.sh
-./configure-hlh-ai-engine.sh --host 192.168.1.12
+./configure-hlh-ai-engine-igpu.sh
+./configure-hlh-ai-engine-igpu.sh --host 192.168.1.12
 ```
 
 Switch loaded models (inside LXC after deployment):
@@ -59,10 +59,10 @@ RADV_PERFTEST=nogttspill llama-bench -m /srv/ai/models/Qwen3-Coder-30B-A3B-Instr
 
 Deployment and configuration are separate phases:
 
-1. **Provisioning**: `deploy-hlh-ai-engine.sh` creates privileged LXC `112`, wires GPU passthrough
+1. **Provisioning**: `deploy-hlh-ai-engine-igpu.sh` creates privileged LXC `112`, wires GPU passthrough
    (`card0`+`renderD128`+`kfd` only — `226:1`, `226:128`, `511:0`+`234:0`; RX480 `gfx803` excluded), prints `ROCm ${ROCM_VERSION}` + `HIP+Vulkan gfx1150`,
    and pushes `ansible/files/configure-ai-engine-inside-lxc.sh` via `pct push` (`env ROCM_VERSION=...` forwarded).
-2. **Configuration**: `ansible/playbooks/hlh-ai-engine.yml` runs `ansible/files/configure-ai-engine-inside-lxc.sh` inside the container
+2. **Configuration**: `ansible/playbooks/hlh-ai-engine-igpu.yml` runs `ansible/files/configure-ai-engine-inside-lxc.sh` inside the container
    (installs `ROCM_VERSION` `amdrocm${MM}-gfx1150` + `Vulkan` deps, builds `llama.cpp` dual `GGML_HIP=ON + GGML_VULKAN=ON`).
 
 ## OpenTofu Module
@@ -76,11 +76,11 @@ module "hlh_ai_engine" {
   pm_api_token_id     = var.pm_api_token_id
   pm_api_token_secret = var.pm_api_token_secret
   target_node         = var.target_node
-  hostname            = "hlh-ai-engine"
+  hostname            = "hlh-ai-engine-igpu"
   vmid                = 112  # .12 parity with 192.168.1.12
   # ... other variables (see opentofu/variables.tf)
 }
-# GPU cgroup/mount for /dev/dri + /dev/kfd appended by deploy-hlh-ai-engine.sh post-create
+# GPU cgroup/mount for /dev/dri + /dev/kfd appended by deploy-hlh-ai-engine-igpu.sh post-create
 ```
 
 ## Runtime Contract
@@ -96,12 +96,12 @@ module "hlh_ai_engine" {
 ## Repository Layout
 
 ```
-hlh-ai-engine/
-├── deploy-hlh-ai-engine.sh          # LXC creation + GPU passthrough + bootstrap
-├── configure-hlh-ai-engine.sh       # Ansible-based reconfiguration
+hlh-ai-engine-igpu/
+├── deploy-hlh-ai-engine-igpu.sh          # LXC creation + GPU passthrough + bootstrap
+├── configure-hlh-ai-engine-igpu.sh       # Ansible-based reconfiguration
 ├── ansible/
-│   ├── inventories/hlh-ai-engine.yml
-│   ├── playbooks/hlh-ai-engine.yml
+│   ├── inventories/hlh-ai-engine-igpu.yml
+│   ├── playbooks/hlh-ai-engine-igpu.yml
 │   └── files/configure-ai-engine-inside-lxc.sh
 ├── opentofu/
 │   ├── main.tf
@@ -174,7 +174,7 @@ KV cache VRAM estimates:
 | GPU Vulkan | `vulkaninfo --summary` && `RADV_PERFTEST=nogttspill llama-bench -dev Vulkan0` |
 | Both backends | `nm /opt/llama.cpp/build/bin/llama-server \| grep -i -E 'hip|vulkan'` |
 | Logs | `journalctl -u ai-engine -f` |
-| Deployed version | `grep ROCM_VERSION /root/ai-engine-bootstrap/configure-ai-engine-inside-lxc.sh` ; `ROCM_VERSION=... ./deploy-hlh-ai-engine.sh` prints header |
+| Deployed version | `grep ROCM_VERSION /root/ai-engine-bootstrap/configure-ai-engine-inside-lxc.sh` ; `ROCM_VERSION=... ./deploy-hlh-ai-engine-igpu.sh` prints header |
 
 `switch-model.sh` probes `http://127.0.0.1:80/health` for up to 90s after restart (real readiness, not `systemctl is-active` crash-loop green). Deploy prints `ROCm version : ${ROCM_VERSION} | Backend: HIP+Vulkan dual, gfx1150` on `[6/6]`.
 
