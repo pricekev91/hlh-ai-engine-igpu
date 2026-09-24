@@ -247,7 +247,7 @@ pct create "${LXC_ID}" "${LXC_IMAGE}" \
 	--unprivileged 0 \
 	--onboot 1 \
 	--mp0 "${MODEL_HOST_DIR},mp=${MODEL_LXC_DIR}" \
-	--description "llama.cpp AI engine ${LLAMA_BACKEND} ROCm ${ROCM_VERSION}, model storage on ${POOL} (Qwen3-Coder-30B)"
+	--description "llama.cpp AI engine ${LLAMA_BACKEND} ROCm ${ROCM_VERSION}, model storage on ${POOL} (Qwen3.6-35B-A3B-MTP 96K MTP)"
 
 echo "[3/6] Adding GPU/ROCm passthrough devices..."
 # Only the 890M iGPU (gfx1150): card0 (226:0) + renderD128 (226:128)

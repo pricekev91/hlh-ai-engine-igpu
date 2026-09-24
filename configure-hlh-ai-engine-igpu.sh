@@ -105,8 +105,8 @@ set -euo pipefail
 
 # --- CONFIGURABLE ---
 MODEL_DIR="/srv/ai/models"
-DEFAULT_MODEL_URL="https://huggingface.co/bartowski/Qwen3-Coder-30B-A3B-Instruct-GGUF/resolve/main/Qwen3-Coder-30B-A3B-Instruct-Q4_K_M.gguf"
-DEFAULT_MODEL_FILE="Qwen3-Coder-30B-A3B-Instruct-Q4_K_M.gguf"
+DEFAULT_MODEL_FILE="Qwen3.6-35B-A3B-MTP-Q4_K_M.gguf"
+DEFAULT_MODEL_URL=""
 LLAMA_CPP_REPO="https://github.com/ggerganov/llama.cpp.git"
 LLAMA_CPP_DIR="/opt/llama.cpp"
 # NOTE: builds latest master. DFlash2 (PR #27342) and TurboQuant are NOT in
@@ -389,6 +389,7 @@ if [ -f "${MODEL_DIR}/${DEFAULT_MODEL_FILE}" ]; then
   echo "Default model already present: $ACTIVE_MODEL_FILE"
 else
   PREFERRED_MODELS=(
+    "Qwen3.6-35B-A3B-MTP-Q4_K_M.gguf"
     "Qwen3-Coder-30B-A3B-Instruct-Q4_K_M.gguf"
     "Qwen_Qwen3.6-35B-A3B-Q4_K_M.gguf"
     "Qwen_Qwen3-Coder-Next-Q4_K_M.gguf"
@@ -408,6 +409,10 @@ else
       echo "Using existing model from mounted storage: $ACTIVE_MODEL_FILE"
     else
       ACTIVE_MODEL_FILE="$DEFAULT_MODEL_FILE"
+      if [ -z "$DEFAULT_MODEL_URL" ]; then
+        echo "ERROR: No .gguf on shared mount $MODEL_DIR and no DEFAULT_MODEL_URL — populate host /srv/ai/models with $DEFAULT_MODEL_FILE first" >&2
+        exit 1
+      fi
       echo "No existing models found; downloading default model: $ACTIVE_MODEL_FILE"
       wget -O "${MODEL_DIR}/${ACTIVE_MODEL_FILE}" "$DEFAULT_MODEL_URL"
     fi
@@ -427,6 +432,8 @@ for ENTRY in "${DFLASH2_DRAFT_FILE}|${DFLASH2_DRAFT_URL}"; do
 done
 
 # --- 4. SYSTEMD SERVICE ---
+# Default: Qwen3.6-35B-A3B-MTP-Q4_K_M (~21GB) + 96K ctx KV q4_0 (~12GB) = ~33GB fits 48GB UMA.
+# MTP enabled (MoE auto n-max 5), -ngl 48 / batch 128 / parallel 1 kept (known good on 890M).
 echo "[4/7] Creating systemd service for llama-server..."
 cat > "$SYSTEMD_SERVICE" << UNIT
 [Unit]
@@ -444,12 +451,14 @@ Environment=HIP_PATH=${ROCM_PATH}
 ExecStart=${LLAMA_CPP_DIR}/build/bin/llama-server \
   --model ${MODEL_DIR}/${ACTIVE_MODEL_FILE} \
   --host 0.0.0.0 --port 80 \
-  --ctx-size 4096 \
+  --ctx-size 98304 \
   -ngl 48 \
   --batch-size 128 \
   --parallel 1 \
   --cache-type-k q4_0 \
-  --cache-type-v q4_0
+  --cache-type-v q4_0 \
+  --spec-type draft-mtp \
+  --spec-draft-n-max 5
 Restart=on-failure
 RestartSec=10
 User=root

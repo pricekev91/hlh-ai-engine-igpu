@@ -86,7 +86,7 @@ hlh-ai-engine-igpu/
 | OpenAI-compatible base | `http://192.168.1.12:80/v1/` |
 | Model storage | `/srv/ai/models` (host mount) |
 | GPU device | `/dev/dri` + `/dev/kfd` bind-mount |
-| Default model | Qwen3-Coder-30B-A3B-Instruct-Q4_K_M.gguf |
+| Default model | Qwen3.6-35B-A3B-MTP-Q4_K_M.gguf (96K ctx, KV q4_0, MTP draft n-max 5) |
 
 ## GPU Backend Notes
 
@@ -107,14 +107,14 @@ Default llama-server flags (from systemd unit):
 | `--model` | mounted GGUF path | Model file |
 | `--host` | `0.0.0.0` | Listen on all interfaces |
 | `--port` | `80` | Native web UI + API port |
-| `--ctx-size` | `4096` | Context window (switch via `switch-model.sh`) |
+| `--ctx-size` | `98304` (96K) | Context window (switch via `switch-model.sh`) |
 | `-ngl` | `48` | GPU offload layers |
 | `--batch-size` | `128` | Batch size for inference |
 | `--parallel` | `1` | Request parallelism |
 | `--cache-type-k` | `q4_0` | KV key cache quantization |
 | `--cache-type-v` | `q4_0` | KV value cache quantization |
 | `--spec-type` | `draft-mtp` | MTP speculative decoding (auto-detected for MTP models) |
-| `--spec-draft-n-max` | `3` | MTP draft tokens |
+| `--spec-draft-n-max` | `5` | MTP draft tokens (MoE auto) |
 
 Context size options (via `switch-model.sh`):
 
