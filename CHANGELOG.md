@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **KISS refactor**: removed `ansible/` + `opentofu/` — two bash files only (`deploy-` + `configure-hlh-ai-engine-igpu.sh` with embedded `--bootstrap-inside`), matching `hlh-ai-engine-egpu` pattern. Deploy pushes itself via `pct push`/`scp` with `ROCM_VERSION` forwarded; added post-bootstrap `ai-engine` + `/health` fail-fast check.
 - **Repo renamed** `hlh-ai-engine` → `hlh-ai-engine-igpu` — named for the 890M iGPU slot (.12), matching `hlh-ai-engine-egpu` (.11 workhorse) scheme.
 - **Hostname** `hlh-ai-engine` → `hlh-ai-engine-igpu`; scripts `deploy-/configure-hlh-ai-engine-igpu.sh`; ansible `hlh_ai_engine_igpu` group + `hlh-ai-engine-igpu.yml` inventory/playbook; opentofu `hlh_ai_engine_igpu` resource. VMID stays `112`, IP stays `192.168.1.12`, 48GB RAM unchanged.
 

@@ -49,13 +49,11 @@ This is what is already implemented and verified in this repository.
 - llama-server native web UI + API on port 80 inside LXC
 - OpenAI-compatible API at port 80/v1/
 
-## Ansible Configuration
+## Configuration (bash-only, no ansible)
 
-- Ansible inventory: `ansible/inventories/hlh-ai-engine-igpu.yml` (`192.168.1.12` `ansible_user: root`)
-- Playbook: `ansible/playbooks/hlh-ai-engine-igpu.yml` (`ansible.builtin.script` → `configure-ai-engine-inside-lxc.sh`)
-- Bootstrap script: `ansible/files/configure-ai-engine-inside-lxc.sh` **(v0.9.4)** dual `HIP+Vulkan`, unpinned `ROCM_VERSION` `10.0.0` default, never pinned
+- Bootstrap embedded in `configure-hlh-ai-engine-igpu.sh --bootstrap-inside` (was `ansible/files/configure-ai-engine-inside-lxc.sh` v0.9.5) dual `HIP+Vulkan`, unpinned `ROCM_VERSION` `10.0.0` default, never pinned
 - SSH key-based auth: `~/.ssh/id_ed25519`
-- Reconfiguration via `configure-hlh-ai-engine-igpu.sh` with `--host` and `--offline` flags
+- Reconfiguration via `configure-hlh-ai-engine-igpu.sh` with `--host` / `--via-ssh` (host pushes itself via `pct push`/`scp` and re-runs `--bootstrap-inside`)
 
 ## Speculative Decoding (MTP / standard)
 
@@ -70,17 +68,15 @@ This is what is already implemented and verified in this repository.
 - Known limitation: Qwen3.8-27B caps at ~4.3 tok/s on this iGPU (Gated Delta Net
   fused kernels unsupported on HIP); Qwen3.6-27B+MTP is the fast config (~7.6-7.8)
 
-## OpenTofu Provisioning
+## Provisioning (bash-only, no opentofu)
 
-- Proxmox provider: `telmate/proxmox >= 2.7.2` (BACKLOG: migrate to `bpg/proxmox`)
-- LXC resource `proxmox_lxc hlh_ai_engine` `vmid 112` `192.168.1.12/24`, `48G`/`12c`/`64G` on `RaidZ1-6TB`, `mp0 /srv/ai/models`
-- Variables for API URL, token auth, network, and storage (`opentofu/variables.tf`)
-- GPU passthrough (cgroup allow + mount entries) **appended by `deploy-hlh-ai-engine-igpu.sh` post-create** (not native provider passthrough — avoids exposing `gfx803`)
+- LXC `112` `192.168.1.12/24`, `48G`/`12c`/`64G` on `RaidZ1-6TB`, `mp0 /srv/ai/models` via `deploy-hlh-ai-engine-igpu.sh` (opentofu module removed KISS)
+- GPU passthrough (cgroup allow + mount entries) in `deploy-hlh-ai-engine-igpu.sh` post-create (not provider passthrough — avoids exposing `gfx803`)
 
 ## Configuration Scripts
 
 - `deploy-hlh-ai-engine-igpu.sh` - Full LXC `112` creation, GPU passthrough (`card0`+`renderD128`+`kfd`), bootstrap with `ROCM_VERSION` header + `HIP+Vulkan` `gfx1150` description
-- `configure-hlh-ai-engine-igpu.sh` - Ansible-based reconfiguration with `--host` and `--offline` flags (`hlh_offline` → `HLH_OFFLINE`)
+- `configure-hlh-ai-engine-igpu.sh` - Bash reconfiguration with `--host` / `--via-ssh` / `--bootstrap-inside` (embedded bootstrap, no ansible)
 
 ## Service Lifecycle
 

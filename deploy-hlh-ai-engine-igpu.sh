@@ -2,7 +2,7 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-BOOTSTRAP_SCRIPT="${SCRIPT_DIR}/ansible/files/configure-ai-engine-inside-lxc.sh"
+BOOTSTRAP_SCRIPT="${SCRIPT_DIR}/configure-hlh-ai-engine-igpu.sh"
 
 usage() {
 	cat <<'EOF'
@@ -281,8 +281,12 @@ sleep 5
 
 echo "[5/6] Running in-container bootstrap (ROCm ${ROCM_VERSION}, ${LLAMA_BACKEND})..."
 pct exec "${LXC_ID}" -- mkdir -p /root/ai-engine-bootstrap
-pct push "${LXC_ID}" "$BOOTSTRAP_SCRIPT" /root/ai-engine-bootstrap/configure-ai-engine-inside-lxc.sh --perms 0755
-pct exec "${LXC_ID}" -- env ROCM_VERSION="${ROCM_VERSION}" bash /root/ai-engine-bootstrap/configure-ai-engine-inside-lxc.sh
+pct push "${LXC_ID}" "$BOOTSTRAP_SCRIPT" /root/ai-engine-bootstrap/configure-hlh-ai-engine-igpu.sh --perms 0755
+pct exec "${LXC_ID}" -- env ROCM_VERSION="${ROCM_VERSION}" bash /root/ai-engine-bootstrap/configure-hlh-ai-engine-igpu.sh --bootstrap-inside
+
+echo "[5/6] Verifying bootstrap (fail-fast instead of silent port-80 refused)..."
+pct exec "${LXC_ID}" -- systemctl is-active ai-engine >/dev/null 2>&1 || { echo "ERROR: ai-engine.service not active after bootstrap — check: pct exec ${LXC_ID} -- journalctl -u ai-engine -n 100" >&2; exit 1; }
+pct exec "${LXC_ID}" -- curl -fsS -m 5 http://127.0.0.1:80/health >/dev/null 2>&1 || echo "WARNING: ai-engine active but /health not ready yet (model load can take minutes) — check journalctl" >&2
 
 echo "[6/6] Deployment complete. LXC ${LXC_ID} (${LXC_NAME}) is running."
 echo "Model storage: ${MODEL_HOST_DIR} (host) <-> ${MODEL_LXC_DIR} (container) on ${POOL}"

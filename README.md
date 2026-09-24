@@ -36,15 +36,16 @@ Deploy the AI engine LXC on the Proxmox host (upgrades host ROCm if needed, then
 ./deploy-hlh-ai-engine-igpu.sh              # default 10.0.0 (latest 2026-08-26) — prompts to upgrade host 7.14→10.0 if needed
 # Override ROCm version (never pinned):
 ROCM_VERSION=7.14.1 ./deploy-hlh-ai-engine-igpu.sh   # stay on older stable to match host without upgrade
-# Bootstrap also respects: ROCM_VERSION=10.0.0 bash ansible/files/configure-ai-engine-inside-lxc.sh
+# Bootstrap also respects: ROCM_VERSION=10.0.0 ./configure-hlh-ai-engine-igpu.sh --bootstrap-inside
 # Host must match LXC major (7.x vs 10.x): deploy now checks host $(get_host_rocm_version) and prompts to upgrade host via stable.repo.amd.com
 ```
 
-Reconfigure an existing LXC via Ansible:
+Reconfigure an existing LXC via bash (no recreate, no ansible):
 
 ```bash
 ./configure-hlh-ai-engine-igpu.sh
 ./configure-hlh-ai-engine-igpu.sh --host 192.168.1.12
+./configure-hlh-ai-engine-igpu.sh --via-ssh --host 192.168.1.12
 ```
 
 Switch loaded models (inside LXC after deployment):
@@ -57,30 +58,24 @@ RADV_PERFTEST=nogttspill llama-bench -m /srv/ai/models/Qwen3-Coder-30B-A3B-Instr
 
 ## Deployment Model
 
-Deployment and configuration are separate phases:
+Two bash scripts only (no ansible/opentofu):
 
 1. **Provisioning**: `deploy-hlh-ai-engine-igpu.sh` creates privileged LXC `112`, wires GPU passthrough
    (`card0`+`renderD128`+`kfd` only — `226:1`, `226:128`, `511:0`+`234:0`; RX480 `gfx803` excluded), prints `ROCm ${ROCM_VERSION}` + `HIP+Vulkan gfx1150`,
-   and pushes `ansible/files/configure-ai-engine-inside-lxc.sh` via `pct push` (`env ROCM_VERSION=...` forwarded).
-2. **Configuration**: `ansible/playbooks/hlh-ai-engine-igpu.yml` runs `ansible/files/configure-ai-engine-inside-lxc.sh` inside the container
-   (installs `ROCM_VERSION` `amdrocm${MM}-gfx1150` + `Vulkan` deps, builds `llama.cpp` dual `GGML_HIP=ON + GGML_VULKAN=ON`).
+   and pushes itself-embedded bootstrap via `pct push` (`env ROCM_VERSION=...` forwarded).
+2. **Configuration**: `configure-hlh-ai-engine-igpu.sh` - when run on host it pushes itself into the LXC via `pct exec`/`ssh` and re-runs with `--bootstrap-inside`; that flag runs the embedded bootstrap (ROCm + Vulkan + llama.cpp `HIP+Vulkan` `gfx1150`). No separate inside file.
 
-## OpenTofu Module
+## Repository Layout
 
-For programmatic LXC creation via OpenTofu (bind mount, not storage volume):
-
-```hcl
-module "hlh_ai_engine" {
-  source = "./opentofu"
-  pm_api_url          = var.pm_api_url
-  pm_api_token_id     = var.pm_api_token_id
-  pm_api_token_secret = var.pm_api_token_secret
-  target_node         = var.target_node
-  hostname            = "hlh-ai-engine-igpu"
-  vmid                = 112  # .12 parity with 192.168.1.12
-  # ... other variables (see opentofu/variables.tf)
-}
-# GPU cgroup/mount for /dev/dri + /dev/kfd appended by deploy-hlh-ai-engine-igpu.sh post-create
+```
+hlh-ai-engine-igpu/
+├── deploy-hlh-ai-engine-igpu.sh    # Provision: LXC creation + GPU passthrough + bootstrap (bash)
+├── configure-hlh-ai-engine-igpu.sh # Configuration: host wrapper + embedded bootstrap --bootstrap-inside (bash only)
+├── 00_BACKLOG.md
+├── 10_ACTIVE.md
+├── 90_DONE.md
+├── CHANGELOG.md
+└── README.md
 ```
 
 ## Runtime Contract
@@ -93,32 +88,12 @@ module "hlh_ai_engine" {
 | GPU device | `/dev/dri` + `/dev/kfd` bind-mount |
 | Default model | Qwen3-Coder-30B-A3B-Instruct-Q4_K_M.gguf |
 
-## Repository Layout
-
-```
-hlh-ai-engine-igpu/
-├── deploy-hlh-ai-engine-igpu.sh          # LXC creation + GPU passthrough + bootstrap
-├── configure-hlh-ai-engine-igpu.sh       # Ansible-based reconfiguration
-├── ansible/
-│   ├── inventories/hlh-ai-engine-igpu.yml
-│   ├── playbooks/hlh-ai-engine-igpu.yml
-│   └── files/configure-ai-engine-inside-lxc.sh
-├── opentofu/
-│   ├── main.tf
-│   └── variables.tf
-├── 00_BACKLOG.md
-├── 10_ACTIVE.md
-├── 90_DONE.md
-├── CHANGELOG.md
-└── README.md
-```
-
 ## GPU Backend Notes
 
 **Dual HIP+Vulkan — single chip `gfx1150` (890M Strix Halo), no perf hit.** HIP *is* ROCm (`GGML_HIP` = ROCm path); Vulkan is Mesa RADV. Earlier single-ROCm builds disabled Vulkan for missing `SPIRV-Headers` — now resolved (`libvulkan-dev`, `glslang-tools` `glslc`, `spirv-tools`).
 
 - ROCm `10.0.0` default (unpinned, latest 2026-08-26; never pinned). `7.14.x` + `10.0.x` both support `gfx1150` natively via `rocBLAS`; deploy always prints version. Package names track `major.minor`: `amdrocm10.0-gfx1150` for `10.0.0`, `amdrocm7.14-gfx1150` for `7.14.1` (`ROCM_MM=$(cut -d. -f1,2)` in bootstrap). GPU PCI IDs: `card0` (was `card1`), `renderD128` (was `renderD129`), kfd `511:0` (ROCm 7) + `234:0` (ROCm 10).
-- `HSA_OVERRIDE_GFX_VERSION=11.5.0` set in `ai-engine.service` `ansible/files/configure-ai-engine-inside-lxc.sh:62` — rocBLAS native `gfx1150`.
+- `HSA_OVERRIDE_GFX_VERSION=11.5.0` set in `ai-engine.service` via embedded bootstrap in `configure-hlh-ai-engine-igpu.sh` — rocBLAS native `gfx1150`.
 - `AMDGPU_TARGETS=gfx1150` at build time (chip-locked repo; not multi-target).
 - `GGML_HIP=ON + GGML_VULKAN=ON` — same binaries, runtime pick `-dev ROCm0|Vulkan0`. Pure HIP vs dual has **no inference perf delta** (HIP uses `rocBLAS`, Vulkan uses `RADV ACO`; disjoint codegen, idle backend not dispatched). Binary `+~12-18M`, build `+4-6m` only.
 - Vulkan sees full UMA `48G VRAM + 40G GTT = 88G` vs HIP `48G` only. For `≤30B Q4` (e.g. `Qwen3-Coder-30B` `~21G`) HIP `pp` faster (`~332` vs `267` `7B pp512` on `890M`); for `35B+ Q8` or large `96K` `q8_0` `~24G` KV, Vulkan `RADV_PERFTEST=nogttspill` wins (`~370` vs `150 pp` on `96G` box) — dual lets `switch-model.sh` stay HIP default with Vulkan fallback.
