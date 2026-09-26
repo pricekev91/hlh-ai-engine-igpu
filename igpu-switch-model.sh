@@ -1,9 +1,11 @@
 #!/usr/bin/env bash
-# switch-model.sh
-# Version: 1.7.1
+# igpu-switch-model.sh
+# Version: 1.7.2
 # Description: Interactive model switcher for llama.cpp ai-engine service
 # Supports: model selection, ctx-size, KV cache quantization, speculative decoding method (MTP draft / ngram / none)
 # Changelog:
+#   1.7.2 - Renamed switch-model.sh -> igpu-switch-model.sh (parity with
+#           egpu-switch-model.sh; makes box obvious in /usr/local/bin + /srv/ai/models).
 #   1.7.1 - Added --metrics to the generated ExecStart (llama-server must be
 #           started with --metrics to expose /metrics for Prometheus scraping).
 #           Script moved to a standalone repo file (single source of truth;
@@ -128,7 +130,7 @@ rewrite_execstart() {
 # ─── Banner ────────────────────────────────────────────────────────────────────
 echo ""
 echo "╔══════════════════════════════════════════════════════════════════╗"
-echo "║                      switch-model.sh                             ║"
+echo "║                igpu-switch-model.sh                              ║"
 echo "╠══════════════════════════════════════════════════════════════════╣"
 echo "║  VRAM BUDGET REFERENCE  (model weights + KV cache = total need)  ║"
 echo "║                                                                  ║"

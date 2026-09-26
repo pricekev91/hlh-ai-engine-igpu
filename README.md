@@ -51,7 +51,7 @@ Reconfigure an existing LXC via bash (no recreate, no ansible):
 Switch loaded models (inside LXC after deployment):
 
 ```bash
-switch-model.sh          # interactive: model, ctx-size 8K-96K, KV q4_0/q6_0/q8_0, spec MTP/ngram/none
+igpu-switch-model.sh     # interactive: model, ctx-size 8K-96K, KV q4_0/q6_0/q8_0, spec MTP/ngram/none
 # Vulkan large-model tip:
 RADV_PERFTEST=nogttspill llama-bench -m /srv/ai/models/Qwen3-Coder-30B-A3B-Instruct-Q4_K_M.gguf -ngl 48 -dev Vulkan0,ROCm0
 ```
@@ -63,8 +63,8 @@ Three files only (no ansible/opentofu):
 1. **Provisioning**: `deploy-hlh-ai-engine-igpu.sh` creates privileged LXC `112`, wires GPU passthrough
    (`card0`+`renderD128`+`kfd` only — `226:1`, `226:128`, `511:0`+`234:0`; RX480 `gfx803` excluded), prints `ROCm ${ROCM_VERSION}` + `HIP+Vulkan gfx1150`,
    and pushes itself-embedded bootstrap via `pct push` (`env ROCM_VERSION=...` forwarded).
-2. **Configuration**: `configure-hlh-ai-engine-igpu.sh` - when run on host it pushes itself (plus `switch-model.sh`) into the LXC via `pct exec`/`ssh` and re-runs with `--bootstrap-inside`; that flag runs the embedded bootstrap (ROCm + Vulkan + llama.cpp `HIP+Vulkan` `gfx1150`) and installs `switch-model.sh` to `/usr/local/bin/` + `/srv/ai/models/`. No separate inside file.
-3. **Model switcher**: `switch-model.sh` - standalone interactive switcher (single source of truth, installed by configure; v1.7.1 adds `--metrics` to the generated ExecStart so `/metrics` is exposed for Prometheus).
+2. **Configuration**: `configure-hlh-ai-engine-igpu.sh` - when run on host it pushes itself (plus `igpu-switch-model.sh`) into the LXC via `pct exec`/`ssh` and re-runs with `--bootstrap-inside`; that flag runs the embedded bootstrap (ROCm + Vulkan + llama.cpp `HIP+Vulkan` `gfx1150`) and installs `igpu-switch-model.sh` to `/usr/local/bin/` + `/srv/ai/models/`. No separate inside file.
+3. **Model switcher**: `igpu-switch-model.sh` - standalone interactive switcher (single source of truth, installed by configure; v1.7.2 = renamed for box parity with `egpu-switch-model.sh`; v1.7.1 adds `--metrics` to the generated ExecStart so `/metrics` is exposed for Prometheus).
 
 ## Repository Layout
 
@@ -72,7 +72,7 @@ Three files only (no ansible/opentofu):
 hlh-ai-engine-igpu/
 ├── deploy-hlh-ai-engine-igpu.sh    # Provision: LXC creation + GPU passthrough + bootstrap (bash)
 ├── configure-hlh-ai-engine-igpu.sh # Configuration: host wrapper + embedded bootstrap --bootstrap-inside (bash only)
-├── switch-model.sh                 # Interactive model switcher (installed by configure; single source of truth)
+├── igpu-switch-model.sh            # Interactive model switcher (installed by configure; single source of truth)
 ├── 00_BACKLOG.md
 ├── 10_ACTIVE.md
 ├── 90_DONE.md
@@ -98,7 +98,7 @@ hlh-ai-engine-igpu/
 - `HSA_OVERRIDE_GFX_VERSION=11.5.0` set in `ai-engine.service` via embedded bootstrap in `configure-hlh-ai-engine-igpu.sh` — rocBLAS native `gfx1150`.
 - `AMDGPU_TARGETS=gfx1150` at build time (chip-locked repo; not multi-target).
 - `GGML_HIP=ON + GGML_VULKAN=ON` — same binaries, runtime pick `-dev ROCm0|Vulkan0`. Pure HIP vs dual has **no inference perf delta** (HIP uses `rocBLAS`, Vulkan uses `RADV ACO`; disjoint codegen, idle backend not dispatched). Binary `+~12-18M`, build `+4-6m` only.
-- Vulkan sees full UMA `48G VRAM + 40G GTT = 88G` vs HIP `48G` only. For `≤30B Q4` (e.g. `Qwen3-Coder-30B` `~21G`) HIP `pp` faster (`~332` vs `267` `7B pp512` on `890M`); for `35B+ Q8` or large `96K` `q8_0` `~24G` KV, Vulkan `RADV_PERFTEST=nogttspill` wins (`~370` vs `150 pp` on `96G` box) — dual lets `switch-model.sh` stay HIP default with Vulkan fallback.
+- Vulkan sees full UMA `48G VRAM + 40G GTT = 88G` vs HIP `48G` only. For `≤30B Q4` (e.g. `Qwen3-Coder-30B` `~21G`) HIP `pp` faster (`~332` vs `267` `7B pp512` on `890M`); for `35B+ Q8` or large `96K` `q8_0` `~24G` KV, Vulkan `RADV_PERFTEST=nogttspill` wins (`~370` vs `150 pp` on `96G` box) — dual lets `igpu-switch-model.sh` stay HIP default with Vulkan fallback.
 
 ## llama.cpp Tuning Reference
 
@@ -109,7 +109,7 @@ Default llama-server flags (from systemd unit):
 | `--model` | mounted GGUF path | Model file |
 | `--host` | `0.0.0.0` | Listen on all interfaces |
 | `--port` | `80` | Native web UI + API port |
-| `--ctx-size` | `98304` (96K) | Context window (switch via `switch-model.sh`) |
+| `--ctx-size` | `98304` (96K) | Context window (switch via `igpu-switch-model.sh`) |
 | `-ngl` | `48` | GPU offload layers |
 | `--batch-size` | `128` | Batch size for inference |
 | `--parallel` | `1` | Request parallelism |
@@ -118,7 +118,7 @@ Default llama-server flags (from systemd unit):
 | `--spec-type` | `draft-mtp` | MTP speculative decoding (auto-detected for MTP models) |
 | `--spec-draft-n-max` | `5` | MTP draft tokens (MoE auto) |
 
-Context size options (via `switch-model.sh`):
+Context size options (via `igpu-switch-model.sh`):
 
 | Option | ctx-size | Description |
 |--------|----------|-------------|
@@ -153,7 +153,7 @@ KV cache VRAM estimates:
 | Logs | `journalctl -u ai-engine -f` |
 | Deployed version | `grep ROCM_VERSION /root/ai-engine-bootstrap/configure-ai-engine-inside-lxc.sh` ; `ROCM_VERSION=... ./deploy-hlh-ai-engine-igpu.sh` prints header |
 
-`switch-model.sh` probes `http://127.0.0.1:80/health` for up to 90s after restart (real readiness, not `systemctl is-active` crash-loop green). Deploy prints `ROCm version : ${ROCM_VERSION} | Backend: HIP+Vulkan dual, gfx1150` on `[6/6]`.
+`igpu-switch-model.sh` probes `http://127.0.0.1:80/health` for up to 90s after restart (real readiness, not `systemctl is-active` crash-loop green). Deploy prints `ROCm version : ${ROCM_VERSION} | Backend: HIP+Vulkan dual, gfx1150` on `[6/6]`.
 
 ## Governance
 

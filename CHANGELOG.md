@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **Renamed `switch-model.sh` -> `igpu-switch-model.sh` (v1.7.2)** — box parity with `egpu-switch-model.sh` (.11); deployed as `/usr/local/bin/igpu-switch-model.sh` + `/srv/ai/models/igpu-switch-model.sh`. Old-name files should be removed from hosts after deploy.
 - **switch-model.sh extracted from configure heredoc into a standalone repo file** (single source of truth). `configure-hlh-ai-engine-igpu.sh` now installs it (`install -m 0755`) to `/usr/local/bin/switch-model.sh` + `/srv/ai/models/switch-model.sh` instead of generating it; bootstrap (pct/ssh) ships `switch-model.sh` alongside the configure script, and configure fails fast if it is missing.
 - **KISS refactor**: removed `ansible/` + `opentofu/` — two bash files only (`deploy-` + `configure-hlh-ai-engine-igpu.sh` with embedded `--bootstrap-inside`), matching `hlh-ai-engine-egpu` pattern. Deploy pushes itself via `pct push`/`scp` with `ROCM_VERSION` forwarded; added post-bootstrap `ai-engine` + `/health` fail-fast check.
 - **Repo renamed** `hlh-ai-engine` → `hlh-ai-engine-igpu` — named for the 890M iGPU slot (.12), matching `hlh-ai-engine-egpu` (.11 workhorse) scheme.

@@ -54,6 +54,9 @@ if $BOOTSTRAP_INSIDE; then
 # Target GPU: AMD Radeon 890M (gfx1150/Strix Halo) on Proxmox 9.x privileged LXC — gfx1150-only chip
 # Requirements: Run as root inside privileged LXC with GPU passthrough (/dev/dri/card0, renderD128, /dev/kfd) and /srv/ai/models bind mount
 # Changelog:
+#   0.9.8 - Renamed switch-model.sh -> igpu-switch-model.sh (v1.7.2) for box parity with
+#           egpu-switch-model.sh (.11). Deployed as /usr/local/bin/igpu-switch-model.sh +
+#           /srv/ai/models/igpu-switch-model.sh.
 #   0.9.7 - switch-model.sh v1.7.1: extracted from heredoc into a standalone repo file
 #           (single source of truth — configure now installs it instead of generating it).
 #           Generated ExecStart includes --metrics so llama-server exposes /metrics for
@@ -119,7 +122,7 @@ LLAMA_CPP_DIR="/opt/llama.cpp"
 # LLAMA_CPP_PIN="5ecbe1ac17ec0484c5b44af0bd580cdc9c428ed4"  # DFlash2 PR #27342 (open, unmerged)
 SERVICE_NAME="ai-engine"
 SYSTEMD_SERVICE="/etc/systemd/system/${SERVICE_NAME}.service"
-SWITCH_SCRIPT="/usr/local/bin/switch-model.sh"
+SWITCH_SCRIPT="/usr/local/bin/igpu-switch-model.sh"
 GFX_VERSION="11.5.0"   # gfx1150 native — rocBLAS 7.14.x / 10.0.x supports it
 ROCM_PATH="/opt/rocm"
 # Unpinned: tracks latest stable (default 10.0.0 2026-08-26). Override via env:
@@ -474,15 +477,15 @@ UNIT
 
 # --- 5. MODEL SWITCH SCRIPT (standalone repo file — single source of truth) ---
 echo "[5/7] Installing interactive model switcher: $SWITCH_SCRIPT..."
-SWITCH_SRC="${SCRIPT_DIR}/switch-model.sh"
+SWITCH_SRC="${SCRIPT_DIR}/igpu-switch-model.sh"
 if [[ ! -f "$SWITCH_SRC" ]]; then
-    echo "ERROR: ${SWITCH_SRC} not found — switch-model.sh must live next to this configure script in the repo" >&2
+    echo "ERROR: ${SWITCH_SRC} not found — igpu-switch-model.sh must live next to this configure script in the repo" >&2
     exit 1
 fi
 install -m 0755 "$SWITCH_SRC" "$SWITCH_SCRIPT"
 
-# Keep /srv/ai/models/switch-model.sh in sync (both locations exist on this host)
-install -m 0755 "$SWITCH_SRC" "${MODEL_DIR}/switch-model.sh"
+# Keep /srv/ai/models/igpu-switch-model.sh in sync (both locations exist on this host)
+install -m 0755 "$SWITCH_SRC" "${MODEL_DIR}/igpu-switch-model.sh"
 
 # --- 5b. MODEL DOWNLOAD HELPER (dl.sh) ---
 echo "[5b/7] Creating model download helper: ${MODEL_DIR}/dl.sh..."
@@ -558,7 +561,7 @@ systemctl status "$SERVICE_NAME" --no-pager
 echo ""
 echo "[Bootstrap complete - v0.9.5]"
 echo "  Native llama.cpp web UI : http://<container-ip>:80 (HIP+Vulkan dual, gfx1150-only chip)"
-echo "  Switch models with      : switch-model.sh (MTP/ngram/none; HIP default, Vulkan via RADV_PERFTEST=nogttspill)"
+echo "  Switch models with      : igpu-switch-model.sh (MTP/ngram/none; HIP default, Vulkan via RADV_PERFTEST=nogttspill)"
 echo "  GPU device              : gfx1150 (AMD Radeon 890M) — ROCm HIP + Vulkan RADV"
 echo "  ROCm version            : ${ROCM_VERSION} (unpinned; override: ROCM_VERSION=x.y.z ./deploy-hlh-ai-engine.sh)"
 echo "  Backend                 : HIP+Vulkan dual (GGML_HIP=ON + GGML_VULKAN=ON, AMDGPU_TARGETS=gfx1150)"
@@ -576,7 +579,7 @@ if ! $VIA_SSH && command -v pct >/dev/null 2>&1 && pct status "$LXC_ID" >/dev/nu
         echo "[configure] Using pct exec for LXC $LXC_ID ($TARGET_HOST)..."
         pct exec "$LXC_ID" -- mkdir -p /root/ai-engine-bootstrap
         pct push "$LXC_ID" "$0" /root/ai-engine-bootstrap/configure-hlh-ai-engine-igpu.sh --perms 0755
-        pct push "$LXC_ID" "${SCRIPT_DIR}/switch-model.sh" /root/ai-engine-bootstrap/switch-model.sh --perms 0755
+        pct push "$LXC_ID" "${SCRIPT_DIR}/igpu-switch-model.sh" /root/ai-engine-bootstrap/igpu-switch-model.sh --perms 0755
         pct exec "$LXC_ID" -- env ROCM_VERSION="${ROCM_VERSION:-10.0.0}" bash /root/ai-engine-bootstrap/configure-hlh-ai-engine-igpu.sh --bootstrap-inside
         echo "[configure] Done via pct exec."
         exit 0
@@ -588,6 +591,6 @@ echo "[configure] Using ssh root@$TARGET_HOST..."
 SSH_OPTS="-o StrictHostKeyChecking=no -o ConnectTimeout=10"
 if [[ -f "$SSH_KEY" ]]; then SSH_OPTS="$SSH_OPTS -i $SSH_KEY"; fi
 scp $SSH_OPTS "$0" root@"$TARGET_HOST":/tmp/configure-hlh-ai-engine-igpu.sh 2>&1 | head -n 20
-scp $SSH_OPTS "${SCRIPT_DIR}/switch-model.sh" root@"$TARGET_HOST":/tmp/switch-model.sh 2>&1 | head -n 20
+scp $SSH_OPTS "${SCRIPT_DIR}/igpu-switch-model.sh" root@"$TARGET_HOST":/tmp/igpu-switch-model.sh 2>&1 | head -n 20
 ssh $SSH_OPTS root@"$TARGET_HOST" "ROCM_VERSION='${ROCM_VERSION:-10.0.0}' bash /tmp/configure-hlh-ai-engine-igpu.sh --bootstrap-inside" 2>&1
 echo "[configure] Done via ssh."
