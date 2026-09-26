@@ -280,8 +280,11 @@ pct start "${LXC_ID}"
 sleep 5
 
 echo "[5/6] Running in-container bootstrap (ROCm ${ROCM_VERSION}, ${LLAMA_BACKEND})..."
+[[ -f "${SCRIPT_DIR}/igpu-switch-model.sh" ]] || { echo "ERROR: igpu-switch-model.sh not found next to deploy script (repo is the source of authority)" >&2; exit 1; }
 pct exec "${LXC_ID}" -- mkdir -p /root/ai-engine-bootstrap
 pct push "${LXC_ID}" "$BOOTSTRAP_SCRIPT" /root/ai-engine-bootstrap/configure-hlh-ai-engine-igpu.sh --perms 0755
+# configure's [5/7] installs this (repo file = source of authority; overwrites host copies on every deploy)
+pct push "${LXC_ID}" "${SCRIPT_DIR}/igpu-switch-model.sh" /root/ai-engine-bootstrap/igpu-switch-model.sh --perms 0755
 pct exec "${LXC_ID}" -- env ROCM_VERSION="${ROCM_VERSION}" bash /root/ai-engine-bootstrap/configure-hlh-ai-engine-igpu.sh --bootstrap-inside
 
 echo "[5/6] Verifying bootstrap (fail-fast instead of silent port-80 refused)..."

@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **deploy fix**: `deploy-hlh-ai-engine-igpu.sh` now ships `igpu-switch-model.sh` into the LXC bootstrap dir (was missing after the heredoc extraction — bootstrap would have failed fast at [5/7]). Repo file is the source of authority: every deploy/configure run overwrites both host copies (`/usr/local/bin/` + `/srv/ai/models/`) via `install -m 0755`.
 - **Renamed `switch-model.sh` -> `igpu-switch-model.sh` (v1.7.2)** — box parity with `egpu-switch-model.sh` (.11); deployed as `/usr/local/bin/igpu-switch-model.sh` + `/srv/ai/models/igpu-switch-model.sh`. Old-name files should be removed from hosts after deploy.
 - **switch-model.sh extracted from configure heredoc into a standalone repo file** (single source of truth). `configure-hlh-ai-engine-igpu.sh` now installs it (`install -m 0755`) to `/usr/local/bin/switch-model.sh` + `/srv/ai/models/switch-model.sh` instead of generating it; bootstrap (pct/ssh) ships `switch-model.sh` alongside the configure script, and configure fails fast if it is missing.
 - **KISS refactor**: removed `ansible/` + `opentofu/` — two bash files only (`deploy-` + `configure-hlh-ai-engine-igpu.sh` with embedded `--bootstrap-inside`), matching `hlh-ai-engine-egpu` pattern. Deploy pushes itself via `pct push`/`scp` with `ROCM_VERSION` forwarded; added post-bootstrap `ai-engine` + `/health` fail-fast check.
