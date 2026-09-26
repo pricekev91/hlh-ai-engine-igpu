@@ -58,12 +58,13 @@ RADV_PERFTEST=nogttspill llama-bench -m /srv/ai/models/Qwen3-Coder-30B-A3B-Instr
 
 ## Deployment Model
 
-Two bash scripts only (no ansible/opentofu):
+Three files only (no ansible/opentofu):
 
 1. **Provisioning**: `deploy-hlh-ai-engine-igpu.sh` creates privileged LXC `112`, wires GPU passthrough
    (`card0`+`renderD128`+`kfd` only — `226:1`, `226:128`, `511:0`+`234:0`; RX480 `gfx803` excluded), prints `ROCm ${ROCM_VERSION}` + `HIP+Vulkan gfx1150`,
    and pushes itself-embedded bootstrap via `pct push` (`env ROCM_VERSION=...` forwarded).
-2. **Configuration**: `configure-hlh-ai-engine-igpu.sh` - when run on host it pushes itself into the LXC via `pct exec`/`ssh` and re-runs with `--bootstrap-inside`; that flag runs the embedded bootstrap (ROCm + Vulkan + llama.cpp `HIP+Vulkan` `gfx1150`). No separate inside file.
+2. **Configuration**: `configure-hlh-ai-engine-igpu.sh` - when run on host it pushes itself (plus `switch-model.sh`) into the LXC via `pct exec`/`ssh` and re-runs with `--bootstrap-inside`; that flag runs the embedded bootstrap (ROCm + Vulkan + llama.cpp `HIP+Vulkan` `gfx1150`) and installs `switch-model.sh` to `/usr/local/bin/` + `/srv/ai/models/`. No separate inside file.
+3. **Model switcher**: `switch-model.sh` - standalone interactive switcher (single source of truth, installed by configure; v1.7.1 adds `--metrics` to the generated ExecStart so `/metrics` is exposed for Prometheus).
 
 ## Repository Layout
 
@@ -71,6 +72,7 @@ Two bash scripts only (no ansible/opentofu):
 hlh-ai-engine-igpu/
 ├── deploy-hlh-ai-engine-igpu.sh    # Provision: LXC creation + GPU passthrough + bootstrap (bash)
 ├── configure-hlh-ai-engine-igpu.sh # Configuration: host wrapper + embedded bootstrap --bootstrap-inside (bash only)
+├── switch-model.sh                 # Interactive model switcher (installed by configure; single source of truth)
 ├── 00_BACKLOG.md
 ├── 10_ACTIVE.md
 ├── 90_DONE.md

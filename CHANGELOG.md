@@ -9,12 +9,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **switch-model.sh extracted from configure heredoc into a standalone repo file** (single source of truth). `configure-hlh-ai-engine-igpu.sh` now installs it (`install -m 0755`) to `/usr/local/bin/switch-model.sh` + `/srv/ai/models/switch-model.sh` instead of generating it; bootstrap (pct/ssh) ships `switch-model.sh` alongside the configure script, and configure fails fast if it is missing.
 - **KISS refactor**: removed `ansible/` + `opentofu/` — two bash files only (`deploy-` + `configure-hlh-ai-engine-igpu.sh` with embedded `--bootstrap-inside`), matching `hlh-ai-engine-egpu` pattern. Deploy pushes itself via `pct push`/`scp` with `ROCM_VERSION` forwarded; added post-bootstrap `ai-engine` + `/health` fail-fast check.
 - **Repo renamed** `hlh-ai-engine` → `hlh-ai-engine-igpu` — named for the 890M iGPU slot (.12), matching `hlh-ai-engine-egpu` (.11 workhorse) scheme.
 - **Hostname** `hlh-ai-engine` → `hlh-ai-engine-igpu`; scripts `deploy-/configure-hlh-ai-engine-igpu.sh`; ansible `hlh_ai_engine_igpu` group + `hlh-ai-engine-igpu.yml` inventory/playbook; opentofu `hlh_ai_engine_igpu` resource. VMID stays `112`, IP stays `192.168.1.12`, 48GB RAM unchanged.
 
 ### Added
 
+- **switch-model.sh v1.7.1**: generated ExecStart now includes `--metrics` so llama-server exposes `/metrics` for Prometheus scraping (fixes `hlh-llama.cpp-igpu` dashboard No Data — target was 501). Configured unit also gets `--metrics`.
 - switch-model.sh v1.6.1: real readiness check (`/health` probe, crash-loop detection)
 - Required-model enforcement: DFlash2 draft GGUF
   `Qwen3.8-27B-DFlash2-Q4_K_M.gguf` is downloaded from
